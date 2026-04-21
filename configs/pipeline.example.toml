@@ -1,0 +1,80 @@
+[project]
+title = "电影一键浓缩系统"
+target_minutes = 12
+language = "zh"
+fallback_duration_seconds = 7200
+
+[providers]
+shot_detector = "stub"
+asr = "stub"
+vision = "stub"
+story = "heuristic"
+script = "template"
+selector = "heuristic"
+
+[shot_detection]
+target_shot_count = 160
+min_shot_length = 1.2
+
+[compression]
+selection_ratio = 0.2
+coverage_per_arc = 2
+scene_group_size = 8
+short_ratio = 0.35
+teaser_ratio = 0.12
+
+[script]
+max_chars = 2200
+tone = "通俗、有感染力、强调冲突和转折"
+
+[frames]
+frames_per_scene = 2
+image_max_width = 896
+image_quality = 3
+
+[pyscenedetect]
+detector = "content"
+threshold = 27.0
+min_scene_len_frames = 15
+
+[faster_whisper]
+model = "small"
+device = "auto"
+compute_type = "int8"
+beam_size = 5
+vad_filter = true
+condition_on_previous_text = true
+
+[openai]
+api_key_env = "OPENAI_API_KEY"
+base_url = "https://api.openai.com/v1/responses"
+scene_model = "gpt-4o"
+script_model = "gpt-4o"
+image_detail = "low"
+scene_max_output_tokens = 900
+script_max_output_tokens = 2600
+scene_temperature = 0.2
+script_temperature = 0.8
+timeout_seconds = 120
+
+[gemini]
+api_key_env = "GEMINI_API_KEY"
+base_url = "https://generativelanguage.googleapis.com/v1beta"
+scene_model = "gemini-2.5-flash"
+script_model = "gemini-2.5-flash"
+scene_max_output_tokens = 900
+script_max_output_tokens = 2600
+scene_temperature = 0.2
+script_temperature = 0.8
+timeout_seconds = 120
+
+[ollama]
+base_url = "http://127.0.0.1:11434/api/chat"
+scene_model = "gemma4:31b-cloud"
+script_model = "gemma4:31b-cloud"
+keep_alive = "5m"
+scene_max_output_tokens = 900
+script_max_output_tokens = 2600
+scene_temperature = 0.2
+script_temperature = 0.8
+timeout_seconds = 180

@@ -1,0 +1,45 @@
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local environment files
+.env
+.env.*
+
+# Coverage and test artifacts
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# IDE/editor files
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Runtime outputs
+runs/
+exports/
+
+# Local input media
+*.mp4
+

@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "movie-brief"
+version = "0.1.0"
+description = "MVP scaffold for automatic movie commentary compression"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+  { name = "OpenAI Codex" }
+]
+dependencies = []
+
+[project.optional-dependencies]
+video = [
+  "scenedetect[opencv]>=0.6.2",
+  "faster-whisper>=1.1.0",
+]
+llm = [
+  "ollama>=0.4.0",
+]
+
+[project.scripts]
+movie-brief = "movie_brief.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
