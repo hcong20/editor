@@ -4,8 +4,17 @@ from pathlib import Path
 from typing import Any
 
 from movie_brief.config import PipelineConfig
-from movie_brief.models import RenderPlan, Scene, ScriptSegment, Shot, StoryBeat, Utterance
+from movie_brief.models import (
+    DeliveryResult,
+    RenderPlan,
+    Scene,
+    ScriptSegment,
+    Shot,
+    StoryBeat,
+    Utterance,
+)
 from movie_brief.stages.asr import build_asr_engine
+from movie_brief.stages.delivery import build_delivery_orchestrator
 from movie_brief.stages.render_plan import RenderPlanner
 from movie_brief.stages.scene_understanding import build_scene_understanding_engine
 from movie_brief.stages.script_generation import build_script_generator
@@ -25,6 +34,11 @@ class MovieCommentaryPipeline:
         self.script_generator = build_script_generator(config.providers.script)
         self.selector = build_scene_selector(config.providers.selector)
         self.render_planner = RenderPlanner()
+        self.delivery = build_delivery_orchestrator(
+            config.providers.video_editor,
+            config.providers.tts,
+            config.providers.subtitles,
+        )
 
     def run(self, input_video: Path, output_dir: Path) -> None:
         if not input_video.exists():
@@ -65,6 +79,17 @@ class MovieCommentaryPipeline:
         )
         write_json(output_dir / "07_render_plan.json", render_plan)
 
+        delivery_result: DeliveryResult | None = None
+        if self.config.delivery.enabled:
+            delivery_result = self.delivery.deliver(
+                input_video=input_video,
+                output_dir=output_dir,
+                render_plan=render_plan,
+                script_segments=script_segments,
+                config=self.config,
+            )
+            write_json(output_dir / "08_delivery.json", delivery_result)
+
         summary = _build_summary(
             input_video=input_video,
             config=self.config,
@@ -74,6 +99,7 @@ class MovieCommentaryPipeline:
             beats=beats,
             script_segments=script_segments,
             render_plan=render_plan,
+            delivery_result=delivery_result,
         )
         write_text(output_dir / "summary.md", summary)
 
@@ -110,6 +136,7 @@ def _build_summary(
     beats: list[StoryBeat],
     script_segments: list[ScriptSegment],
     render_plan: RenderPlan,
+    delivery_result: DeliveryResult | None,
 ) -> str:
     beat_lines = []
     for beat in beats:
@@ -122,6 +149,17 @@ def _build_summary(
         segment_lines.append(
             f"- {segment.title} ({segment.target_seconds}s): {segment.narration}"
         )
+
+    delivery_lines = ["- 未启用自动交付"]
+    if delivery_result is not None:
+        delivery_lines = [
+            f"- 交付版本: {delivery_result.variant}",
+            f"- 导出 clip 数: {len(delivery_result.clip_paths)}",
+            f"- 拼接视频: {delivery_result.concat_video_path or '暂无'}",
+            f"- 配音音频: {delivery_result.narration_audio_path or '暂无'}",
+            f"- 字幕文件: {delivery_result.subtitle_path or '暂无'}",
+            f"- 最终视频: {delivery_result.final_video_path or '暂无'}",
+        ]
 
     selected_ids = ", ".join(clip.scene_id for clip in render_plan.clips)
     return f"""# 运行摘要
@@ -163,6 +201,10 @@ def _build_summary(
 
 - 首个 shot 起点: {format_seconds(shots[0].window.start) if shots else "00:00:00"}
 - 最后 shot 终点: {format_seconds(shots[-1].window.end) if shots else "00:00:00"}
+
+## 自动交付
+
+{chr(10).join(delivery_lines)}
 """
 
 

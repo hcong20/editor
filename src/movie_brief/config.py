@@ -22,6 +22,9 @@ class ProviderSettings:
     story: str = "heuristic"
     script: str = "template"
     selector: str = "heuristic"
+    video_editor: str = "ffmpeg"
+    tts: str = "stub"
+    subtitles: str = "heuristic"
 
 
 @dataclass(slots=True)
@@ -43,6 +46,36 @@ class CompressionSettings:
 class ScriptSettings:
     max_chars: int = 2200
     tone: str = "通俗、有感染力、强调冲突和转折"
+
+
+@dataclass(slots=True)
+class DeliverySettings:
+    enabled: bool = False
+    variant: str = "commentary_10m"
+    burn_subtitles: bool = True
+    concat_filename: str = "08_movie_cut.mp4"
+    final_filename: str = "09_commentary_final.mp4"
+
+
+@dataclass(slots=True)
+class TTSSettings:
+    edge_voice: str = "zh-CN-YunxiNeural"
+    edge_rate: str = "+0%"
+    elevenlabs_api_key_env: str = "ELEVENLABS_API_KEY"
+    elevenlabs_voice_id: str = ""
+    elevenlabs_model_id: str = "eleven_multilingual_v2"
+    azure_key_env: str = "AZURE_SPEECH_KEY"
+    azure_region_env: str = "AZURE_SPEECH_REGION"
+    azure_voice: str = "zh-CN-YunxiNeural"
+
+
+@dataclass(slots=True)
+class SubtitleSettings:
+    max_chars_per_line: int = 24
+    min_seconds_per_line: float = 1.2
+    whisper_model: str = "small"
+    whisper_device: str = "auto"
+    whisper_compute_type: str = "int8"
 
 
 @dataclass(slots=True)
@@ -116,6 +149,9 @@ class PipelineConfig:
     shot_detection: ShotDetectionSettings = field(default_factory=ShotDetectionSettings)
     compression: CompressionSettings = field(default_factory=CompressionSettings)
     script: ScriptSettings = field(default_factory=ScriptSettings)
+    delivery: DeliverySettings = field(default_factory=DeliverySettings)
+    tts: TTSSettings = field(default_factory=TTSSettings)
+    subtitles: SubtitleSettings = field(default_factory=SubtitleSettings)
     frames: FrameExtractionSettings = field(default_factory=FrameExtractionSettings)
     pyscenedetect: PySceneDetectSettings = field(default_factory=PySceneDetectSettings)
     faster_whisper: FasterWhisperSettings = field(default_factory=FasterWhisperSettings)

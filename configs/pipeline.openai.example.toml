@@ -11,6 +11,9 @@ vision = "openai"
 story = "openai"
 script = "openai"
 selector = "heuristic"
+video_editor = "ffmpeg"
+tts = "auto"
+subtitles = "auto"
 
 [shot_detection]
 target_shot_count = 160
@@ -26,6 +29,30 @@ teaser_ratio = 0.12
 [script]
 max_chars = 2200
 tone = "通俗、有感染力、强调冲突和转折"
+
+[delivery]
+enabled = false
+variant = "commentary_10m"
+burn_subtitles = true
+concat_filename = "08_movie_cut.mp4"
+final_filename = "09_commentary_final.mp4"
+
+[tts]
+edge_voice = "zh-CN-YunxiNeural"
+edge_rate = "+0%"
+elevenlabs_api_key_env = "ELEVENLABS_API_KEY"
+elevenlabs_voice_id = ""
+elevenlabs_model_id = "eleven_multilingual_v2"
+azure_key_env = "AZURE_SPEECH_KEY"
+azure_region_env = "AZURE_SPEECH_REGION"
+azure_voice = "zh-CN-YunxiNeural"
+
+[subtitles]
+max_chars_per_line = 24
+min_seconds_per_line = 1.2
+whisper_model = "small"
+whisper_device = "auto"
+whisper_compute_type = "int8"
 
 [frames]
 frames_per_scene = 2

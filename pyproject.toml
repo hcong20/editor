@@ -17,9 +17,14 @@ dependencies = []
 video = [
   "scenedetect[opencv]>=0.6.2",
   "faster-whisper>=1.1.0",
+  "moviepy>=1.0.3",
 ]
 llm = [
   "ollama>=0.4.0",
+]
+delivery = [
+  "edge-tts>=6.1.12",
+  "azure-cognitiveservices-speech>=1.42.0",
 ]
 
 [project.scripts]

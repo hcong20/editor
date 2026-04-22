@@ -9,6 +9,7 @@
 5. 解说脚本生成
 6. 关键片段选择
 7. 输出剪辑计划与多版本产物规划
+8. 自动交付（可选）：剪辑 + 配音 + 字幕 + 成片合成
 
 当前版本优先解决两件事：
 
@@ -23,6 +24,8 @@
 - `faster-whisper` / `Whisper` 做 ASR
 - `GPT-4o` / `Gemini` / `Ollama` / `LLaVA` 做 scene 级理解与脚本生成
 - `FFmpeg` / `MoviePy` 做自动剪辑
+- `Edge TTS` / `ElevenLabs` / `Azure TTS` 做自动配音
+- `Whisper` / `faster-whisper` 做自动字幕
 
 ## 快速开始
 
@@ -43,7 +46,7 @@ python3 main.py \
 安装可选依赖：
 
 ```bash
-python3 -m pip install -e ".[video]"
+python3 -m pip install -e ".[video,delivery]"
 ```
 
 使用真实 provider：
@@ -69,6 +72,39 @@ asr = "auto"
 - 如果检测到 `faster_whisper`，就用 `faster-whisper`
 - 如果存在同名 `.srt/.vtt/.txt`，ASR 会优先读 sidecar 字幕
 - 如果依赖没装，则自动回退到 `stub`
+
+## 自动交付模式（剪辑 + 配音 + 字幕）
+
+你可以在 pipeline 末端直接输出“解说版成片”：
+
+- 视频裁剪: `FFmpeg` / `MoviePy` / `CapCut API`（未配置 API 时自动回退到本地剪辑）
+- 自动配音: `Edge TTS` / `ElevenLabs` / `Azure TTS` / `stub`
+- 自动字幕: `Whisper(faster-whisper)` / `heuristic`
+
+命令行直接开启交付：
+
+```bash
+python3 main.py \
+  --input /path/to/movie.mp4 \
+  --output /Users/eden/Documents/projects/editor/runs/demo_delivery \
+  --config /Users/eden/Documents/projects/editor/configs/pipeline.example.toml \
+  --deliver \
+  --variant commentary_10m
+```
+
+也可以在配置中开启：
+
+```toml
+[delivery]
+enabled = true
+variant = "commentary_10m"
+burn_subtitles = true
+
+[providers]
+video_editor = "ffmpeg"   # ffmpeg | moviepy | capcut-api | auto
+tts = "auto"              # edge-tts | elevenlabs | azure | stub | auto
+subtitles = "auto"        # whisper | heuristic | auto
+```
 
 ## LLM Provider 模式
 
@@ -174,6 +210,7 @@ main.py
 - 四段式故事结构建模
 - 中文解说脚本模板生成
 - 多版本剪辑计划输出
+- 自动交付执行（可选）：导出片段、拼接视频、TTS 配音、SRT 字幕、最终成片
 - `unittest` smoke test
 
 ## 输出文件
@@ -187,13 +224,14 @@ main.py
 - `05_script.json`
 - `06_selected_scenes.json`
 - `07_render_plan.json`
+- `08_delivery.json`（当 `delivery.enabled=true` 时）
 - `scene_frames/`
 - `summary.md`
 
 ## 推荐的下一步
 
 1. 在 `story_modeling.py` 里加入 LLM 版故事结构抽取，把三幕/高潮定位做得更稳
-2. 在 `render_plan.py` 基础上补真实 FFmpeg 裁剪、字幕叠加和 TTS 配音
+2. 为 `CapCut API` 增加稳定的上传/任务轮询/下载实现
 3. 为 `PySceneDetect` 增加 `TransNetV2` 备选 provider
 4. 给 ASR 增加说话人分离和角色对齐
 5. 增加 prompt cache / scene cache，避免重复花费 LLM 成本

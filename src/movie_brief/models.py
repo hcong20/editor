@@ -89,3 +89,14 @@ class RenderPlan:
     clips: list[ClipPlan] = field(default_factory=list)
     variants: dict[str, list[str]] = field(default_factory=dict)
     ffmpeg_commands: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class DeliveryResult:
+    variant: str
+    clip_paths: list[str] = field(default_factory=list)
+    concat_video_path: str | None = None
+    narration_audio_path: str | None = None
+    tts_provider: str | None = None
+    subtitle_path: str | None = None
+    final_video_path: str | None = None

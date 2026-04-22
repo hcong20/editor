@@ -19,6 +19,17 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional TOML config path.",
     )
+    parser.add_argument(
+        "--deliver",
+        action="store_true",
+        help="Enable automatic delivery (cut + TTS + subtitles).",
+    )
+    parser.add_argument(
+        "--variant",
+        type=str,
+        default=None,
+        help="Delivery variant to render, e.g. commentary_10m.",
+    )
     return parser
 
 
@@ -27,6 +38,10 @@ def main() -> int:
     args = parser.parse_args()
 
     config = PipelineConfig.load(args.config)
+    if args.deliver:
+        config.delivery.enabled = True
+    if args.variant:
+        config.delivery.variant = args.variant
     pipeline = MovieCommentaryPipeline(config)
     pipeline.run(args.input, args.output)
 
