@@ -93,7 +93,7 @@ class TemplateScriptGenerator(ScriptGenerator):
             f"{beat.summary} {detail} 解说时不要陷进细碎对白，"
             "而是抓住人物为什么被逼到这一步，以及局势是怎样一步步失控的。"
         )
-        return trim_text(narration, 700)
+        return trim_text(narration, 1000)
 
 
 class OpenAIScriptGenerator(ScriptGenerator):
@@ -288,7 +288,7 @@ def _materialize_script_segments(
         title = str(raw.get("title") or fallback.title).strip() or fallback.title
         narration = trim_text(
             str(raw.get("narration") or fallback.narration).strip() or fallback.narration,
-            900,
+            1000,
         )
         selected_scene_ids = [
             scene_id

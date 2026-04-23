@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 from movie_brief.config import PipelineConfig
@@ -43,15 +44,31 @@ class MovieCommentaryPipeline:
     def run(self, input_video: Path, output_dir: Path) -> None:
         if not input_video.exists():
             raise FileNotFoundError(f"Input video does not exist: {input_video}")
+        run_start = perf_counter()
+        self._log(f"START pipeline for {input_video}")
         ensure_dir(output_dir)
         scene_frames_dir = ensure_dir(output_dir / "scene_frames")
 
+        stage_start = perf_counter()
+        self._log("[1/9] Shot detection...")
         shots = self.shot_detector.detect(input_video, self.config)
         write_json(output_dir / "01_shots.json", shots)
+        self._log(
+            f"[1/9] Done: {len(shots)} shots "
+            f"({perf_counter() - stage_start:.1f}s)"
+        )
 
+        stage_start = perf_counter()
+        self._log("[2/9] ASR transcription...")
         transcript = self.asr_engine.transcribe(input_video, shots, self.config)
         write_json(output_dir / "02_transcript.json", transcript)
+        self._log(
+            f"[2/9] Done: {len(transcript)} utterances "
+            f"({perf_counter() - stage_start:.1f}s)"
+        )
 
+        stage_start = perf_counter()
+        self._log("[3/9] Scene understanding...")
         scenes = self.scene_engine.analyze(
             input_video,
             shots,
@@ -60,16 +77,40 @@ class MovieCommentaryPipeline:
             scene_frames_dir,
         )
         write_json(output_dir / "03_scenes.json", [_scene_payload(scene) for scene in scenes])
+        self._log(
+            f"[3/9] Done: {len(scenes)} scenes "
+            f"({perf_counter() - stage_start:.1f}s)"
+        )
 
+        stage_start = perf_counter()
+        self._log("[4/9] Story modeling...")
         beats = self.story_modeler.build(scenes, self.config)
         write_json(output_dir / "04_story_beats.json", _story_beats_payload(beats, scenes))
+        self._log(
+            f"[4/9] Done: {len(beats)} beats "
+            f"({perf_counter() - stage_start:.1f}s)"
+        )
 
+        stage_start = perf_counter()
+        self._log("[5/9] Script generation...")
         script_segments = self.script_generator.generate(beats, scenes, self.config)
         write_json(output_dir / "05_script.json", script_segments)
+        self._log(
+            f"[5/9] Done: {len(script_segments)} script segments "
+            f"({perf_counter() - stage_start:.1f}s)"
+        )
 
+        stage_start = perf_counter()
+        self._log("[6/9] Scene selection...")
         selected_scene_ids = self.selector.select(scenes, beats, self.config)
         write_json(output_dir / "06_selected_scenes.json", selected_scene_ids)
+        self._log(
+            f"[6/9] Done: {len(selected_scene_ids)} selected scenes "
+            f"({perf_counter() - stage_start:.1f}s)"
+        )
 
+        stage_start = perf_counter()
+        self._log("[7/9] Render plan...")
         render_plan = self.render_planner.plan(
             input_video,
             scenes,
@@ -78,9 +119,15 @@ class MovieCommentaryPipeline:
             self.config,
         )
         write_json(output_dir / "07_render_plan.json", render_plan)
+        self._log(
+            f"[7/9] Done: {len(render_plan.clips)} clips "
+            f"({perf_counter() - stage_start:.1f}s)"
+        )
 
         delivery_result: DeliveryResult | None = None
         if self.config.delivery.enabled:
+            stage_start = perf_counter()
+            self._log(f"[8/9] Delivery ({self.config.delivery.variant})...")
             delivery_result = self.delivery.deliver(
                 input_video=input_video,
                 output_dir=output_dir,
@@ -89,7 +136,15 @@ class MovieCommentaryPipeline:
                 config=self.config,
             )
             write_json(output_dir / "08_delivery.json", delivery_result)
+            self._log(
+                f"[8/9] Done: {len(delivery_result.clip_paths)} exported clips "
+                f"({perf_counter() - stage_start:.1f}s)"
+            )
+        else:
+            self._log("[8/9] Delivery skipped (delivery.enabled = false)")
 
+        stage_start = perf_counter()
+        self._log("[9/9] Writing summary...")
         summary = _build_summary(
             input_video=input_video,
             config=self.config,
@@ -102,6 +157,11 @@ class MovieCommentaryPipeline:
             delivery_result=delivery_result,
         )
         write_text(output_dir / "summary.md", summary)
+        self._log(f"[9/9] Done ({perf_counter() - stage_start:.1f}s)")
+        self._log(f"Pipeline finished in {perf_counter() - run_start:.1f}s")
+
+    def _log(self, message: str) -> None:
+        print(f"[movie-brief] {message}", flush=True)
 
 
 def _scene_payload(scene: Scene) -> dict:
