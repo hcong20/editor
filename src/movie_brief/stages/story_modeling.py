@@ -117,9 +117,13 @@ class _BaseLLMStoryModeler(StoryModeler):
 
 
 class OpenAIStoryModeler(_BaseLLMStoryModeler):
+    def __init__(self) -> None:
+        super().__init__()
+        self.client: OpenAIResponsesJSONClient | None = None
+
     def _generate_payload(self, scenes: list[Scene], config: PipelineConfig) -> dict[str, Any]:
-        client = OpenAIResponsesJSONClient(config.openai)
-        return client.generate_json_with_model(
+        self.client = OpenAIResponsesJSONClient(config.openai)
+        return self.client.generate_json_with_model(
             model=config.openai.scene_model,
             schema_name="story_beats",
             schema=story_beats_schema(),
@@ -132,9 +136,13 @@ class OpenAIStoryModeler(_BaseLLMStoryModeler):
 
 
 class GeminiStoryModeler(_BaseLLMStoryModeler):
+    def __init__(self) -> None:
+        super().__init__()
+        self.client: GeminiJSONClient | None = None
+
     def _generate_payload(self, scenes: list[Scene], config: PipelineConfig) -> dict[str, Any]:
-        client = GeminiJSONClient(config.gemini)
-        return client.generate_json(
+        self.client = GeminiJSONClient(config.gemini)
+        return self.client.generate_json(
             model=config.gemini.scene_model,
             schema=story_beats_schema(),
             system_prompt=STORY_MODELING_SYSTEM_PROMPT,
@@ -146,9 +154,13 @@ class GeminiStoryModeler(_BaseLLMStoryModeler):
 
 
 class OllamaStoryModeler(_BaseLLMStoryModeler):
+    def __init__(self) -> None:
+        super().__init__()
+        self.client: OllamaJSONClient | None = None
+
     def _generate_payload(self, scenes: list[Scene], config: PipelineConfig) -> dict[str, Any]:
-        client = OllamaJSONClient(config.ollama)
-        return client.generate_json(
+        self.client = OllamaJSONClient(config.ollama)
+        return self.client.generate_json(
             model=config.ollama.scene_model,
             schema=story_beats_schema(),
             system_prompt=STORY_MODELING_SYSTEM_PROMPT,

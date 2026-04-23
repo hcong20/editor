@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from tqdm import tqdm
 
 from movie_brief.config import PipelineConfig
 from movie_brief.models import Shot, Utterance
@@ -60,7 +61,7 @@ class StubASREngine(ASREngine):
 
         interval = max(1, len(shots) // len(self.TEMPLATES))
         utterances: list[Utterance] = []
-        for index, template in enumerate(self.TEMPLATES):
+        for index, template in tqdm(enumerate(self.TEMPLATES), desc="Stub ASR", unit="template"):
             shot = shots[min(index * interval, len(shots) - 1)]
             utterances.append(
                 Utterance(
@@ -105,7 +106,7 @@ class FasterWhisperASREngine(ASREngine):
             condition_on_previous_text=settings.condition_on_previous_text,
         )
         utterances: list[Utterance] = []
-        for segment in segments:
+        for segment in tqdm(segments, desc="ASR", unit="segment"):
             utterances.append(
                 Utterance(
                     start=float(segment.start),

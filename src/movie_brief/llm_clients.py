@@ -65,6 +65,7 @@ def parse_json_from_text(text: str) -> dict[str, Any]:
     try:
         parsed = json.loads(cleaned)
     except json.JSONDecodeError as exc:
+        print(f"Failed to parse JSON from model output: {cleaned}")
         raise LLMRequestError(f"Failed to parse JSON response: {exc}") from exc
     if not isinstance(parsed, dict):
         return _coerce_non_object_json(parsed)
@@ -115,6 +116,16 @@ def _extract_openai_text(payload: dict[str, Any]) -> str:
     raise LLMRequestError("OpenAI response did not contain any text output.")
 
 
+def _extract_openai_tokens(payload: dict[str, Any]) -> dict[str, int]:
+    usage = payload.get("usage")
+    if isinstance(usage, dict):
+        return {
+            "input": int(usage.get("input_tokens", 0)),
+            "output": int(usage.get("output_tokens", 0)),
+        }
+    return {"input": 0, "output": 0}
+
+
 def _extract_gemini_text(payload: dict[str, Any]) -> str:
     prompt_feedback = payload.get("promptFeedback") or {}
     if prompt_feedback.get("blockReason"):
@@ -129,6 +140,16 @@ def _extract_gemini_text(payload: dict[str, Any]) -> str:
     if texts:
         return "\n".join(texts)
     raise LLMRequestError("Gemini response did not contain any text output.")
+
+
+def _extract_gemini_tokens(payload: dict[str, Any]) -> dict[str, int]:
+    usage = payload.get("usageMetadata")
+    if isinstance(usage, dict):
+        return {
+            "input": int(usage.get("promptTokenCount", 0)),
+            "output": int(usage.get("candidatesTokenCount", 0)),
+        }
+    return {"input": 0, "output": 0}
 
 
 def _extract_ollama_text(payload: dict[str, Any]) -> str:
@@ -146,6 +167,15 @@ def _extract_ollama_text(payload: dict[str, Any]) -> str:
         return response_text
 
     raise LLMRequestError("Ollama response did not contain any text output.")
+
+
+def _extract_ollama_tokens(payload: dict[str, Any]) -> dict[str, int]:
+    prompt_eval_count = int(payload.get("prompt_eval_count", 0))
+    eval_count = int(payload.get("eval_count", 0))
+    return {
+        "input": prompt_eval_count,
+        "output": eval_count,
+    }
 
 
 def _normalize_ollama_host(base_url: str) -> str:
@@ -182,6 +212,7 @@ def _coerce_ollama_payload(response: Any) -> dict[str, Any]:
 class OpenAIResponsesJSONClient:
     def __init__(self, settings: OpenAISettings) -> None:
         self.settings = settings
+        self.tokens_used: dict[str, int] = {"input": 0, "output": 0}
 
     def generate_json(
         self,
@@ -231,6 +262,9 @@ class OpenAIResponsesJSONClient:
             headers={"Authorization": f"Bearer {api_key}"},
             timeout_seconds=self.settings.timeout_seconds,
         )
+        tokens = _extract_openai_tokens(response)
+        self.tokens_used["input"] += tokens["input"]
+        self.tokens_used["output"] += tokens["output"]
         return parse_json_from_text(_extract_openai_text(response))
 
     def generate_json_with_model(
@@ -263,6 +297,7 @@ class OpenAIResponsesJSONClient:
 class GeminiJSONClient:
     def __init__(self, settings: GeminiSettings) -> None:
         self.settings = settings
+        self.tokens_used: dict[str, int] = {"input": 0, "output": 0}
 
     def generate_json(
         self,
@@ -309,12 +344,16 @@ class GeminiJSONClient:
             headers={"x-goog-api-key": api_key},
             timeout_seconds=self.settings.timeout_seconds,
         )
+        tokens = _extract_gemini_tokens(response)
+        self.tokens_used["input"] += tokens["input"]
+        self.tokens_used["output"] += tokens["output"]
         return parse_json_from_text(_extract_gemini_text(response))
 
 
 class OllamaJSONClient:
     def __init__(self, settings: OllamaSettings) -> None:
         self.settings = settings
+        self.tokens_used: dict[str, int] = {"input": 0, "output": 0}
 
     def generate_json(
         self,
@@ -326,7 +365,6 @@ class OllamaJSONClient:
         max_output_tokens: int,
         temperature: float,
     ) -> dict[str, Any]:
-        sdk_error: LLMRequestError | None = None
         try:
             response = self._chat_via_sdk(
                 model=model,
@@ -338,28 +376,11 @@ class OllamaJSONClient:
                 temperature=temperature,
             )
         except LLMRequestError as exc:
-            response = None
-            sdk_error = exc
-            print(f"Ollama SDK request failed: {exc}. Falling back to HTTP API.")
+            raise LLMRequestError(f"Ollama SDK failed ({exc}).") from exc
 
-        if response is None:
-            try:
-                response = self._chat_via_http(
-                    model=model,
-                    schema=schema,
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                    image_paths=image_paths,
-                    max_output_tokens=max_output_tokens,
-                    temperature=temperature,
-                )
-            except LLMRequestError as exc:
-                if sdk_error is None:
-                    raise
-                raise LLMRequestError(
-                    f"Ollama SDK failed ({sdk_error}); HTTP fallback also failed ({exc})."
-                ) from exc
-
+        tokens = _extract_ollama_tokens(response)
+        self.tokens_used["input"] += tokens["input"]
+        self.tokens_used["output"] += tokens["output"]
         return parse_json_from_text(_extract_ollama_text(response))
 
     def _chat_via_sdk(
@@ -427,46 +448,3 @@ class OllamaJSONClient:
             raise LLMRequestError(f"Ollama SDK error calling {host}: {exc}") from exc
 
         return _coerce_ollama_payload(response)
-
-    def _chat_via_http(
-        self,
-        model: str,
-        schema: dict[str, Any],
-        system_prompt: str,
-        user_prompt: str,
-        image_paths: list[Path] | None,
-        max_output_tokens: int,
-        temperature: float,
-    ) -> dict[str, Any]:
-        user_message: dict[str, Any] = {
-            "role": "user",
-            "content": user_prompt,
-        }
-        if image_paths:
-            user_message["images"] = [image_to_base64(path) for path in image_paths]
-
-        payload: dict[str, Any] = {
-            "model": model,
-            "stream": False,
-            "format": schema,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                user_message,
-            ],
-            "options": {
-                "temperature": temperature,
-                "num_predict": max_output_tokens,
-            },
-            "keep_alive": self.settings.keep_alive,
-        }
-
-        if not self.settings.keep_alive:
-            payload.pop("keep_alive")
-
-        response = _post_json(
-            self.settings.base_url,
-            payload,
-            headers={},
-            timeout_seconds=self.settings.timeout_seconds,
-        )
-        return response

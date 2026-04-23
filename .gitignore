@@ -41,5 +41,5 @@ runs/
 exports/
 
 # Local input media
-*.mp4
+input/
 

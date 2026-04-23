@@ -49,6 +49,9 @@ class MovieCommentaryPipeline:
         ensure_dir(output_dir)
         scene_frames_dir = ensure_dir(output_dir / "scene_frames")
 
+        # Track total token usage across LLM stages
+        cumulative_tokens = {"input": 0, "output": 0}
+
         stage_start = perf_counter()
         self._log("[1/9] Shot detection...")
         shots = self.shot_detector.detect(input_video, self.config)
@@ -77,27 +80,39 @@ class MovieCommentaryPipeline:
             scene_frames_dir,
         )
         write_json(output_dir / "03_scenes.json", [_scene_payload(scene) for scene in scenes])
+        tokens_3 = self._extract_llm_tokens(self.scene_engine)
+        cumulative_tokens["input"] += tokens_3["input"]
+        cumulative_tokens["output"] += tokens_3["output"]
+        token_info_3 = f" | Tokens: {tokens_3['input']}→{tokens_3['output']}" if tokens_3["input"] > 0 else ""
         self._log(
             f"[3/9] Done: {len(scenes)} scenes "
-            f"({perf_counter() - stage_start:.1f}s)"
+            f"({perf_counter() - stage_start:.1f}s){token_info_3}"
         )
 
         stage_start = perf_counter()
         self._log("[4/9] Story modeling...")
         beats = self.story_modeler.build(scenes, self.config)
         write_json(output_dir / "04_story_beats.json", _story_beats_payload(beats, scenes))
+        tokens_4 = self._extract_llm_tokens(self.story_modeler)
+        cumulative_tokens["input"] += tokens_4["input"]
+        cumulative_tokens["output"] += tokens_4["output"]
+        token_info_4 = f" | Tokens: {tokens_4['input']}→{tokens_4['output']}" if tokens_4["input"] > 0 else ""
         self._log(
             f"[4/9] Done: {len(beats)} beats "
-            f"({perf_counter() - stage_start:.1f}s)"
+            f"({perf_counter() - stage_start:.1f}s){token_info_4}"
         )
 
         stage_start = perf_counter()
         self._log("[5/9] Script generation...")
         script_segments = self.script_generator.generate(beats, scenes, self.config)
         write_json(output_dir / "05_script.json", script_segments)
+        tokens_5 = self._extract_llm_tokens(self.script_generator)
+        cumulative_tokens["input"] += tokens_5["input"]
+        cumulative_tokens["output"] += tokens_5["output"]
+        token_info_5 = f" | Tokens: {tokens_5['input']}→{tokens_5['output']}" if tokens_5["input"] > 0 else ""
         self._log(
             f"[5/9] Done: {len(script_segments)} script segments "
-            f"({perf_counter() - stage_start:.1f}s)"
+            f"({perf_counter() - stage_start:.1f}s){token_info_5}"
         )
 
         stage_start = perf_counter()
@@ -158,7 +173,41 @@ class MovieCommentaryPipeline:
         )
         write_text(output_dir / "summary.md", summary)
         self._log(f"[9/9] Done ({perf_counter() - stage_start:.1f}s)")
-        self._log(f"Pipeline finished in {perf_counter() - run_start:.1f}s")
+        
+        total_time = perf_counter() - run_start
+        total_token_info = ""
+        if cumulative_tokens["input"] > 0:
+            total_token_info = f" | Total tokens: {cumulative_tokens['input']}→{cumulative_tokens['output']}"
+        self._log(f"Pipeline finished in {total_time:.1f}s{total_token_info}")
+
+    def _extract_llm_tokens(self, engine: Any) -> dict[str, int]:
+        """Extract token usage from LLM engines by checking for stored client objects."""
+        # For direct LLM engines (OpenAI/Gemini/Ollama modelers/generators)
+        if hasattr(engine, "client") and hasattr(engine.client, "tokens_used"):
+            tokens = dict(engine.client.tokens_used)
+            engine.client.tokens_used = {"input": 0, "output": 0}
+            return tokens
+        
+        # For Auto engines, check which provider was used
+        if hasattr(engine, "openai") and hasattr(engine.openai, "client"):
+            if hasattr(engine.openai.client, "tokens_used"):
+                tokens = dict(engine.openai.client.tokens_used)
+                engine.openai.client.tokens_used = {"input": 0, "output": 0}
+                return tokens
+        
+        if hasattr(engine, "gemini") and hasattr(engine.gemini, "client"):
+            if hasattr(engine.gemini.client, "tokens_used"):
+                tokens = dict(engine.gemini.client.tokens_used)
+                engine.gemini.client.tokens_used = {"input": 0, "output": 0}
+                return tokens
+        
+        if hasattr(engine, "ollama") and hasattr(engine.ollama, "client"):
+            if hasattr(engine.ollama.client, "tokens_used"):
+                tokens = dict(engine.ollama.client.tokens_used)
+                engine.ollama.client.tokens_used = {"input": 0, "output": 0}
+                return tokens
+        
+        return {"input": 0, "output": 0}
 
     def _log(self, message: str) -> None:
         print(f"[movie-brief] {message}", flush=True)

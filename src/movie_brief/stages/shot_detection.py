@@ -64,7 +64,7 @@ class PySceneDetectShotDetector(ShotDetector):
         manager = SceneManager()
         manager.add_detector(detector)
         try:
-            manager.detect_scenes(video=video, show_progress=False)
+            manager.detect_scenes(video=video, show_progress=True)
         except TypeError:
             manager.detect_scenes(video)
 

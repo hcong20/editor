@@ -11,7 +11,9 @@ requires-python = ">=3.11"
 authors = [
   { name = "OpenAI Codex" }
 ]
-dependencies = []
+dependencies = [
+  "tqdm>=4.66.0",
+]
 
 [project.optional-dependencies]
 video = [

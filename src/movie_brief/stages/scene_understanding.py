@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from tqdm import tqdm
+
 from movie_brief.config import PipelineConfig
 from movie_brief.llm_clients import (
     GeminiJSONClient,
@@ -90,10 +92,13 @@ class HeuristicSceneUnderstandingEngine(SceneUnderstandingEngine):
         artifacts_dir: Path | None = None,
     ) -> list[Scene]:
         bundles = _build_scene_bundles(shots, transcript, config)
-        return [_build_heuristic_scene(bundle) for bundle in bundles]
+        return [_build_heuristic_scene(bundle) for bundle in tqdm(bundles, desc="Scene Analysis", unit="scene")]
 
 
 class OpenAISceneUnderstandingEngine(SceneUnderstandingEngine):
+    def __init__(self) -> None:
+        self.client: OpenAIResponsesJSONClient | None = None
+
     def analyze(
         self,
         video_path: Path,
@@ -102,13 +107,13 @@ class OpenAISceneUnderstandingEngine(SceneUnderstandingEngine):
         config: PipelineConfig,
         artifacts_dir: Path | None = None,
     ) -> list[Scene]:
-        client = OpenAIResponsesJSONClient(config.openai)
+        self.client = OpenAIResponsesJSONClient(config.openai)
         bundles = _build_scene_bundles(shots, transcript, config)
         scenes: list[Scene] = []
 
-        for bundle in bundles:
+        for bundle in tqdm(bundles, desc="OpenAI Scene Analysis", unit="scene"):
             frame_paths = _extract_bundle_frames(video_path, bundle, config, artifacts_dir)
-            payload = client.generate_json_with_model(
+            payload = self.client.generate_json_with_model(
                 model=config.openai.scene_model,
                 schema_name="scene_analysis",
                 schema=scene_analysis_schema(),
@@ -131,6 +136,9 @@ class OpenAISceneUnderstandingEngine(SceneUnderstandingEngine):
 
 
 class GeminiSceneUnderstandingEngine(SceneUnderstandingEngine):
+    def __init__(self) -> None:
+        self.client: GeminiJSONClient | None = None
+
     def analyze(
         self,
         video_path: Path,
@@ -139,13 +147,13 @@ class GeminiSceneUnderstandingEngine(SceneUnderstandingEngine):
         config: PipelineConfig,
         artifacts_dir: Path | None = None,
     ) -> list[Scene]:
-        client = GeminiJSONClient(config.gemini)
+        self.client = GeminiJSONClient(config.gemini)
         bundles = _build_scene_bundles(shots, transcript, config)
         scenes: list[Scene] = []
 
-        for bundle in bundles:
+        for bundle in tqdm(bundles, desc="Gemini Scene Analysis", unit="scene"):
             frame_paths = _extract_bundle_frames(video_path, bundle, config, artifacts_dir)
-            payload = client.generate_json(
+            payload = self.client.generate_json(
                 model=config.gemini.scene_model,
                 schema=scene_analysis_schema(),
                 system_prompt=SCENE_ANALYSIS_SYSTEM_PROMPT,
@@ -167,6 +175,9 @@ class GeminiSceneUnderstandingEngine(SceneUnderstandingEngine):
 
 
 class OllamaSceneUnderstandingEngine(SceneUnderstandingEngine):
+    def __init__(self) -> None:
+        self.client: OllamaJSONClient | None = None
+
     def analyze(
         self,
         video_path: Path,
@@ -175,13 +186,13 @@ class OllamaSceneUnderstandingEngine(SceneUnderstandingEngine):
         config: PipelineConfig,
         artifacts_dir: Path | None = None,
     ) -> list[Scene]:
-        client = OllamaJSONClient(config.ollama)
+        self.client = OllamaJSONClient(config.ollama)
         bundles = _build_scene_bundles(shots, transcript, config)
         scenes: list[Scene] = []
 
-        for bundle in bundles:
+        for bundle in tqdm(bundles, desc="Ollama Scene Analysis", unit="scene"):
             frame_paths = _extract_bundle_frames(video_path, bundle, config, artifacts_dir)
-            payload = client.generate_json(
+            payload = self.client.generate_json(
                 model=config.ollama.scene_model,
                 schema=scene_analysis_schema(),
                 system_prompt=SCENE_ANALYSIS_SYSTEM_PROMPT,

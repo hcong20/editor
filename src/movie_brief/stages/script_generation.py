@@ -99,6 +99,7 @@ class TemplateScriptGenerator(ScriptGenerator):
 class OpenAIScriptGenerator(ScriptGenerator):
     def __init__(self) -> None:
         self.fallback = TemplateScriptGenerator()
+        self.client: OpenAIResponsesJSONClient | None = None
 
     def generate(
         self,
@@ -107,8 +108,8 @@ class OpenAIScriptGenerator(ScriptGenerator):
         config: PipelineConfig,
     ) -> list[ScriptSegment]:
         fallback_segments = self.fallback.generate(beats, scenes, config)
-        client = OpenAIResponsesJSONClient(config.openai)
-        payload = client.generate_json_with_model(
+        self.client = OpenAIResponsesJSONClient(config.openai)
+        payload = self.client.generate_json_with_model(
             model=config.openai.script_model,
             schema_name="bilibili_script_segments",
             schema=script_segments_schema(),
@@ -129,6 +130,7 @@ class OpenAIScriptGenerator(ScriptGenerator):
 class GeminiScriptGenerator(ScriptGenerator):
     def __init__(self) -> None:
         self.fallback = TemplateScriptGenerator()
+        self.client: GeminiJSONClient | None = None
 
     def generate(
         self,
@@ -137,8 +139,8 @@ class GeminiScriptGenerator(ScriptGenerator):
         config: PipelineConfig,
     ) -> list[ScriptSegment]:
         fallback_segments = self.fallback.generate(beats, scenes, config)
-        client = GeminiJSONClient(config.gemini)
-        payload = client.generate_json(
+        self.client = GeminiJSONClient(config.gemini)
+        payload = self.client.generate_json(
             model=config.gemini.script_model,
             schema=script_segments_schema(),
             system_prompt=SCRIPT_SYSTEM_PROMPT,
@@ -158,6 +160,7 @@ class GeminiScriptGenerator(ScriptGenerator):
 class OllamaScriptGenerator(ScriptGenerator):
     def __init__(self) -> None:
         self.fallback = TemplateScriptGenerator()
+        self.client: OllamaJSONClient | None = None
 
     def generate(
         self,
@@ -166,8 +169,8 @@ class OllamaScriptGenerator(ScriptGenerator):
         config: PipelineConfig,
     ) -> list[ScriptSegment]:
         fallback_segments = self.fallback.generate(beats, scenes, config)
-        client = OllamaJSONClient(config.ollama)
-        payload = client.generate_json(
+        self.client = OllamaJSONClient(config.ollama)
+        payload = self.client.generate_json(
             model=config.ollama.script_model,
             schema=script_segments_schema(),
             system_prompt=SCRIPT_SYSTEM_PROMPT,
